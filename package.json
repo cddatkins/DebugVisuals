@@ -1,0 +1,19 @@
+{
+  "name": "com.cddatkins.debugvisuals",
+  "version": "1.0.0",
+  "displayName": "Debug Visuals",
+  "description": "A package for debugging visualizations in Unity",
+  "unity": "2022.1",
+  "keywords": [
+        "debug",
+        "visuals",
+        "unity",
+        "development"
+],
+  "author": {
+    "name": "Chris Atkins",
+    "url": "https://cddatkins.github.io/"
+  }
+}
+
+
