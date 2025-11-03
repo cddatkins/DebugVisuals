@@ -1,10 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
 namespace DebugVisuals
 {
     [DefaultExecutionOrder(-1000)]
@@ -23,30 +19,6 @@ namespace DebugVisuals
                 DontDestroyOnLoad(debugDrawerObject);
             }
         }
-
-#if UNITY_EDITOR
-        // Auto-hook into SceneView for Edit Mode drawing
-        [InitializeOnLoadMethod]
-        private static void EditorInit()
-        {
-            //SceneView.duringSceneGui += OnSceneGUI;
-        }
-
-        private static void OnSceneGUI(SceneView sceneView)
-        {
-            /*if (Event.current.type != EventType.Repaint) return;
-
-            EnsureMaterial();
-            _lineMaterial.SetPass(0);
-
-            GL.PushMatrix();
-            GL.MultMatrix(Matrix4x4.identity);
-
-            DebugDrawGL.Render();
-
-            GL.PopMatrix();*/
-        }
-#endif
 
         private void Awake()
         {
