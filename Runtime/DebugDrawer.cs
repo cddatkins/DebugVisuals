@@ -48,6 +48,12 @@ namespace DebugVisuals
             GL.PopMatrix();
         }
 
+        // IMGUI overlay for text
+        private void OnGUI()
+        {
+            DebugDrawGL.RenderGUI();
+        }
+
         private static void EnsureMaterial()
         {
             if (_lineMaterial != null) return;
@@ -72,6 +78,22 @@ namespace DebugVisuals
             public float endTime;
         }
 
+        private struct TextEntry
+        {
+            public string text;
+            public Vector3 position;
+            public Color color;
+            public float endTime;
+            public bool worldSpace;
+            public int fontSize;
+            public Font font;
+            public FontStyle fontStyle;
+        }
+
+        // Optional defaults you can set from DebugDrawer component
+        public static Font DefaultFont;
+        public static FontStyle DefaultFontStyle = FontStyle.Normal;
+
         private const float EDITOR_LINE_DELAY = 0.001f;
         private static Vector3 xyRotationEuler = Vector3.zero;
         private static Vector3 xzRotationEuler = new Vector3(90, 0, 0);
@@ -80,6 +102,9 @@ namespace DebugVisuals
         private static Quaternion yzRotation = Quaternion.Euler(yzRotationEuler);
         private static Quaternion xzRotation = Quaternion.Euler(xzRotationEuler);
         private static readonly List<Line> _lines = new List<Line>(500);
+
+        // text storage
+        private static readonly List<TextEntry> _texts = new List<TextEntry>(200);
 
         // ───────────────────────────────────────
         // Public API
@@ -101,6 +126,35 @@ namespace DebugVisuals
                 end = end,
                 color = color,
                 endTime = duration > 0f ? durationEndTime : defaultEndTime
+            });
+        }
+
+        /// <summary>
+        /// Draw text either in world-space (attached to a world position) or screen-space (pixels).
+        /// When worldSpace == true: position is a world position.
+        /// When worldSpace == false: position is a screen pixel position with origin at bottom-left.
+        /// </summary>
+        public static void DrawText(string text, Vector3 position, Color color, bool worldSpace = true, int fontSize = 12, float duration = 0f, Font font = null, FontStyle fontStyle = FontStyle.Normal)
+        {
+#if UNITY_EDITOR
+            bool isInEditMode = !Application.isPlaying;
+#else
+            bool isInEditMode = false;
+#endif
+            float currentTime = Time.time;
+            float durationEndTime = currentTime + duration;
+            float defaultEndTime = isInEditMode ? currentTime + EDITOR_LINE_DELAY : currentTime;
+
+            _texts.Add(new TextEntry
+            {
+                text = text ?? string.Empty,
+                position = position,
+                color = color,
+                endTime = duration > 0f ? durationEndTime : defaultEndTime,
+                worldSpace = worldSpace,
+                fontSize = Mathf.Max(1, fontSize),
+                font = font,
+                fontStyle = fontStyle,
             });
         }
 
@@ -304,10 +358,81 @@ namespace DebugVisuals
             GL.End();
         }
 
+        // Render GUI text overlay. Called by DebugDrawer.OnGUI()
+        public static void RenderGUI()
+        {
+            if (_texts.Count == 0) return;
+
+            Camera cam = Camera.current ?? Camera.main;
+            float now = Time.time;
+
+            for (int i = _texts.Count - 1; i >= 0; i--)
+            {
+                TextEntry entry = _texts[i];
+
+                if (entry.endTime >= now)
+                {
+                    Vector2 screenPos;
+
+                    if (entry.worldSpace)
+                    {
+                        if (cam == null)
+                        {
+                            // cannot project without a camera
+                            if (entry.endTime < now + 0.001f) RemoveText(i);
+                            continue;
+                        }
+
+                        Vector3 sp = cam.WorldToScreenPoint(entry.position);
+                        if (sp.z < 0f)
+                        {
+                            // behind camera -> skip
+                            if (entry.endTime < now + 0.001f) RemoveText(i);
+                            continue;
+                        }
+
+                        // GUI Y is top-down, WorldToScreenPoint is bottom-up
+                        screenPos = new Vector2(sp.x, Screen.height - sp.y);
+                    }
+                    else
+                    {
+                        // user supplied screen space with origin bottom-left
+                        screenPos = new Vector2(entry.position.x, Screen.height - entry.position.y);
+                    }
+
+                    var style = new GUIStyle(GUI.skin.label)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        fontSize = entry.fontSize
+                    };
+                    style.normal.textColor = entry.color;
+
+                    Vector2 size = style.CalcSize(new GUIContent(entry.text));
+                    Rect rect = new Rect(screenPos.x - size.x * 0.5f, screenPos.y - size.y * 0.5f, size.x, size.y);
+                    GUI.Label(rect, entry.text, style);
+
+                    if (entry.endTime < now + 0.001f)
+                    {
+                        RemoveText(i);
+                    }
+                }
+                else
+                {
+                    RemoveText(i);
+                }
+            }
+        }
+
         private static void RemoveLine(int index)
         {
             _lines[index] = _lines[_lines.Count - 1];
             _lines.RemoveAt(_lines.Count - 1);
+        }
+
+        private static void RemoveText(int index)
+        {
+            _texts[index] = _texts[_texts.Count - 1];
+            _texts.RemoveAt(_texts.Count - 1);
         }
     }
 }
